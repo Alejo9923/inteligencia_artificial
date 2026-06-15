@@ -10,43 +10,42 @@ Original file is located at
 # ============================================================
 # BLOQUE 0 — INSTALACIÓN DE LIBRERÍAS
 # ============================================================
-# Se instalan todas las dependencias necesarias para el proyecto.
-# Ejecutar este bloque primero y reiniciar el runtime si es necesario.
-
-# kaggle        → cliente oficial de Kaggle para descargar datasets via API
-# pandas        → manipulación y análisis de datos en DataFrames
-# numpy         → operaciones numéricas y matriciales
-# scikit-learn  → preprocesamiento, modelos ML y métricas de evaluación
-# transformers  → modelos de lenguaje preentrenados (HuggingFace), requerido por la cátedra
-# torch         → backend de PyTorch, necesario para ejecutar modelos de transformers
-# accelerate    → optimiza la ejecución de modelos HuggingFace en distintos entornos
+# Instalar todas las dependencias del proyecto.
+# Reiniciar el runtime si es necesario tras la instalación.
+#
+# kaggle       — cliente oficial de Kaggle para descargar datasets
+# pandas       — manipulación y análisis de datos en DataFrames
+# numpy        — operaciones numéricas y matriciales
+# scikit-learn — preprocesamiento, modelos ML y métricas
+# transformers — modelos de lenguaje preentrenados (HuggingFace)
+# torch        — backend de PyTorch para ejecutar transformers
+# accelerate   — optimiza la ejecución de modelos HuggingFace
 
 !pip install kaggle pandas numpy scikit-learn transformers==4.41.0 torch accelerate --quiet
 
 # ============================================================
 # BLOQUE 1 — CARGA DEL DATASET DESDE ARCHIVO LOCAL
 # ============================================================
-# Se sube el archivo manualmente desde la PC usando el selector
+# Subir el archivo manualmente desde la PC usando el selector
 # de archivos de Google Colab.
 
 import pandas as pd
 from google.colab import files
 
-print("Subí el archivo Titanic-Dataset.csv cuando aparezca el selector...")
+print("Subir el archivo Titanic-Dataset.csv cuando aparezca el selector...")
 uploaded = files.upload()
 
-# Leer el CSV subido directamente en un DataFrame
+# Leer el CSV en un DataFrame
 df_raw = pd.read_csv("Titanic-Dataset.csv")
 
-print(f"Dataset cargado: {df_raw.shape[0]} filas × {df_raw.shape[1]} columnas")
+print(f"Dataset cargado: {df_raw.shape[0]} filas x {df_raw.shape[1]} columnas")
 print(df_raw.head())
 
 # ============================================================
 # BLOQUE 2 — EXPLORACIÓN INICIAL DEL DATASET
 # ============================================================
-# Se analiza la estructura del dataset antes de pasarlo al
-# Agente 1. Esto permite entender qué trabajo de limpieza
-# será necesario.
+# Analizar la estructura del dataset antes de pasarlo al
+# Agente 1 para entender qué trabajo de limpieza es necesario.
 
 import pandas as pd
 import numpy as np
@@ -55,15 +54,15 @@ print("=" * 60)
 print("EXPLORACIÓN INICIAL DEL DATASET RAW")
 print("=" * 60)
 
-# .shape → tupla (filas, columnas)
-print(f"\n📐 Dimensiones: {df_raw.shape[0]} filas × {df_raw.shape[1]} columnas")
+# shape devuelve una tupla (filas, columnas)
+print(f"\nDimensiones: {df_raw.shape[0]} filas x {df_raw.shape[1]} columnas")
 
-# .dtypes.value_counts() → cuántas columnas hay de cada tipo
+# dtypes.value_counts() cuenta columnas por tipo de dato
 print(f"\nTipos de datos:")
 for tipo, cantidad in df_raw.dtypes.value_counts().items():
     print(f"   {tipo}: {cantidad} columnas")
 
-# .isnull().sum() → nulos por columna
+# isnull().sum() cuenta valores nulos por columna
 nulos = df_raw.isnull().sum()
 nulos_cols = nulos[nulos > 0]
 print(f"\nColumnas con valores nulos ({len(nulos_cols)}):")
@@ -71,15 +70,15 @@ for col, cantidad in nulos_cols.items():
     pct = cantidad / len(df_raw) * 100
     print(f"   {col:<15} {cantidad:>4} nulos  ({pct:.1f}%)")
 
-# Separar columnas por tipo
+# Separar columnas por tipo de dato
 cols_numericas   = df_raw.select_dtypes(include=[np.number]).columns.tolist()
 cols_categoricas = df_raw.select_dtypes(include=["object"]).columns.tolist()
 
-print(f"\nColumnas numéricas  : {cols_numericas}")
-print(f"Columnas categóricas: {cols_categoricas}")
+print(f"\nColumnas numericas  : {cols_numericas}")
+print(f"Columnas categoricas: {cols_categoricas}")
 
-# .describe() → estadísticas descriptivas de columnas numéricas
-print(f"\nEstadísticas descriptivas:")
+# describe() calcula estadisticas descriptivas de columnas numericas
+print(f"\nEstadisticas descriptivas:")
 print(df_raw.describe().T.round(2).to_string())
 
 # Variable objetivo
@@ -90,133 +89,120 @@ print(f"   Tasa de supervivencia: {df_raw['Survived'].mean()*100:.1f}%")
 # ============================================================
 # BLOQUE 3 — AGENTE 1: NORMALIZADOR
 # ============================================================
-# Responsabilidad: recibir el dataset crudo y devolver un
-# dataset limpio, imputado, escalado y codificado.
+# Recibir el dataset crudo y devolver un dataset limpio,
+# imputado, escalado y codificado.
 #
 # Pipeline interno:
 #   1. Separar features (X) del target (y)
 #   2. Descartar columnas sin valor predictivo
-#   3. Identificar columnas numéricas y categóricas
+#   3. Identificar columnas numericas y categoricas
 #   4. Imputar valores nulos
-#   5. Escalar columnas numéricas
-#   6. Codificar columnas categóricas (One-Hot Encoding)
-#   7. Retornar dataset limpio + metadatos del proceso
+#   5. Escalar columnas numericas
+#   6. Codificar columnas categoricas (One-Hot Encoding)
 
 import pandas as pd
 import numpy as np
 
 from sklearn.impute import SimpleImputer
-# SimpleImputer: rellena NaN con una estrategia definida
-# strategy="median"        → para numéricas, robusto a outliers
-# strategy="most_frequent" → para categóricas, usa el valor más común
-# strategy="constant"      → rellena con un valor fijo (fill_value)
+# SimpleImputer: rellenar NaN con una estrategia definida
+# strategy="median"        — para numericas, robusto a outliers
+# strategy="most_frequent" — para categoricas, usa el valor mas comun
 
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-# StandardScaler: transforma cada feature → (x - media) / std
-# Resultado: todas las columnas numéricas quedan en la misma escala (media=0, std=1)
-# Necesario para que Fare (0-512) no domine sobre Pclass (1-3)
-#
-# OneHotEncoder: convierte categorías en columnas binarias
-# "male"/"female" → [1,0] / [0,1]
-# handle_unknown="ignore" → si aparece categoría nueva, no lanza error
+# StandardScaler: transforma cada feature a media=0, std=1
+# OneHotEncoder: convierte categorias en columnas binarias
 
 from sklearn.pipeline import Pipeline
-# Pipeline: encadena transformadores en orden garantizado
-# Evita data leakage: los parámetros se aprenden solo en train
+# Pipeline: encadenar transformadores en orden garantizado
+# Evita data leakage: los parametros se aprenden solo en train
 
 from sklearn.compose import ColumnTransformer
-# ColumnTransformer: aplica pipelines distintos a distintos subconjuntos de columnas
-# y concatena el resultado en un solo array
+# ColumnTransformer: aplicar pipelines distintos por tipo de columna
 
-# ─────────────────────────────────────────────
-# FUNCIÓN PRINCIPAL DEL AGENTE 1
-# ─────────────────────────────────────────────
+
 def agente_normalizador(df: pd.DataFrame, target_col: str = "Survived") -> dict:
     """
     Agente 1 — Normalizador.
 
     Recibe el DataFrame crudo y devuelve un diccionario con:
-      - 'X_procesado' : np.ndarray limpio, escalado y codificado
-      - 'y'           : pd.Series con el target (Survived)
-      - 'preprocessor': ColumnTransformer ajustado (reutilizable en predicción)
-      - 'feature_names': nombres de columnas del array procesado
-      - 'reporte'     : dict con estadísticas del proceso de limpieza
+      - X_procesado  : array limpio, escalado y codificado
+      - y            : Series con el target
+      - preprocessor : ColumnTransformer ajustado
+      - feature_names: nombres de columnas del array procesado
+      - reporte      : dict con estadisticas del proceso
     """
 
     print("=" * 60)
     print("AGENTE 1 — NORMALIZADOR")
     print("=" * 60)
 
-    # ── PASO 1: Separar target ───────────────────────────────────
+    # Separar target del resto de features
     y = df[target_col]
     X = df.drop(columns=[target_col])
 
     print(f"\n[PASO 1] Target separado: '{target_col}'")
 
-    # ── PASO 2: Descartar columnas sin valor predictivo ──────────
-    # PassengerId → identificador numérico sin relación con supervivencia
-    # Name        → texto libre, demasiado único para ser útil directamente
-    # Ticket      → código alfanumérico sin patrón claro explotable
-    # Cabin       → 77% nulos, demasiado disperso para imputar con sentido
+    # Descartar columnas sin valor predictivo:
+    # PassengerId — identificador sin relacion con supervivencia
+    # Name        — texto libre, demasiado unico para ser util
+    # Ticket      — codigo alfanumerico sin patron claro
+    # Cabin       — 77% de valores nulos
     cols_descartar = ["PassengerId", "Name", "Ticket", "Cabin"]
     X = X.drop(columns=cols_descartar, errors="ignore")
 
     print(f"[PASO 2] Columnas descartadas: {cols_descartar}")
-    print(f"         Features restantes: {X.shape[1]} columnas → {list(X.columns)}")
+    print(f"         Features restantes: {X.shape[1]} columnas — {list(X.columns)}")
 
-    # ── PASO 3: Identificar columnas por tipo ────────────────────
+    # Identificar columnas por tipo de dato
     cols_num = X.select_dtypes(include=[np.number]).columns.tolist()
     cols_cat = X.select_dtypes(include=["object"]).columns.tolist()
 
-    print(f"\n[PASO 3] Columnas numéricas  : {cols_num}")
-    print(f"         Columnas categóricas: {cols_cat}")
+    print(f"\n[PASO 3] Columnas numericas  : {cols_num}")
+    print(f"         Columnas categoricas: {cols_cat}")
 
-    # ── PASO 4: Registrar nulos antes de imputación ──────────────
+    # Registrar nulos antes de imputacion
     nulos_num = int(X[cols_num].isnull().sum().sum())
     nulos_cat = int(X[cols_cat].isnull().sum().sum())
 
     print(f"\n[PASO 4] Nulos detectados:")
-    print(f"         Numéricas  : {nulos_num}  (Age)")
-    print(f"         Categóricas: {nulos_cat}  (Embarked)")
+    print(f"         Numericas  : {nulos_num}  (Age)")
+    print(f"         Categoricas: {nulos_cat}  (Embarked)")
 
-    # ── PASO 5: Pipeline para columnas NUMÉRICAS ─────────────────
-    # Paso 1: imputar con la mediana (Age tiene outliers, mediana es más robusta que media)
-    # Paso 2: escalar con StandardScaler
+    # Pipeline para columnas numericas:
+    # imputar con mediana (robusta a outliers) y luego escalar
     pipeline_numerico = Pipeline(steps=[
         ("imputer", SimpleImputer(strategy="median")),
         ("scaler",  StandardScaler())
     ])
 
-    # ── PASO 6: Pipeline para columnas CATEGÓRICAS ───────────────
-    # Paso 1: imputar con el valor más frecuente (Embarked tiene solo 2 nulos)
-    # Paso 2: One-Hot Encoding → genera columnas binarias por cada categoría
+    # Pipeline para columnas categoricas:
+    # imputar con el valor mas frecuente y codificar con OHE
     pipeline_categorico = Pipeline(steps=[
         ("imputer", SimpleImputer(strategy="most_frequent")),
         ("encoder", OneHotEncoder(
-            handle_unknown="ignore",  # categorías nuevas en test → columna de ceros
-            sparse_output=False       # devuelve array denso, más fácil de manejar
+            handle_unknown="ignore",  # categorias nuevas en test generan columna de ceros
+            sparse_output=False       # devolver array denso en lugar de matriz sparse
         ))
     ])
 
-    # ── PASO 7: Combinar pipelines con ColumnTransformer ─────────
+    # Combinar ambos pipelines aplicando cada uno a su subset de columnas
     preprocessor = ColumnTransformer(transformers=[
-        ("num", pipeline_numerico,  cols_num),
+        ("num", pipeline_numerico,   cols_num),
         ("cat", pipeline_categorico, cols_cat)
     ], remainder="drop")
 
-    # ── PASO 8: Ajustar y transformar ────────────────────────────
-    # fit_transform aprende parámetros (mediana, categorías) y transforma en un paso
+    # fit_transform aprende parametros y transforma en un solo paso
     print(f"\n[PASO 8] Ajustando y transformando...")
     X_procesado = preprocessor.fit_transform(X)
 
-    # ── PASO 9: Recuperar nombres de columnas ────────────────────
+    # Recuperar nombres de columnas del output
     feature_names = preprocessor.get_feature_names_out()
 
     print(f"\n[PASO 9] Resultado:")
     print(f"         Shape final          : {X_procesado.shape}")
-    print(f"         Features numéricas   : {len([n for n in feature_names if 'num__' in n])}")
+    print(f"         Features numericas   : {len([n for n in feature_names if 'num__' in n])}")
     print(f"         Features OHE         : {len([n for n in feature_names if 'cat__' in n])}")
-    print(f"         Nulos después        : {np.isnan(X_procesado).sum()}")
+    print(f"         Nulos despues        : {np.isnan(X_procesado).sum()}")
     print(f"         Columnas generadas   : {list(feature_names)}")
 
     reporte = {
@@ -244,75 +230,27 @@ def agente_normalizador(df: pd.DataFrame, target_col: str = "Survived") -> dict:
     }
 
 
-# ─── EJECUCIÓN ────────────────────────────────────────────────
 resultado_agente1 = agente_normalizador(df_raw, target_col="Survived")
 
 # ============================================================
 # BLOQUE 4 — AGENTE 2: ENTRENADOR
 # ============================================================
-# Responsabilidad: recibir el dataset limpio del Agente 1,
-# aplicar validación cruzada, entrenar múltiples modelos de
-# clasificación, seleccionar el mejor y retornar métricas.
+# Recibir el dataset limpio del Agente 1, aplicar validacion
+# cruzada, entrenar multiples modelos de clasificacion,
+# seleccionar el mejor y retornar metricas.
 #
-# Por qué clasificación y no regresión:
-#   El target 'Survived' es binario (0 o 1), por lo tanto el
-#   problema es de clasificación. Los modelos de regresión no
-#   son apropiados para predecir clases discretas.
+# El target 'Survived' es binario (0 o 1), por lo que el
+# problema es de clasificacion.
 #
-# Librerías utilizadas:
-#
-#   sklearn.model_selection.train_test_split
-#     → Divide el dataset en train y test de forma aleatoria.
-#       Es fundamental para evaluar el modelo en datos que nunca
-#       vio durante el entrenamiento (evaluación honesta).
-#
-#   sklearn.model_selection.cross_val_score
-#     → Validación cruzada k-fold: divide el train en k partes,
-#       entrena k veces usando k-1 partes y valida en la restante.
-#       Evita que el resultado dependa de una sola partición.
-#       Da una estimación más confiable del rendimiento real.
-#
-#   sklearn.linear_model.LogisticRegression
-#     → Modelo lineal para clasificación binaria. Aprende la
-#       probabilidad de que un pasajero sobreviva dado sus features.
-#       Es el modelo base (baseline) por su simplicidad e interpretabilidad.
-#       Usa regularización L2 por defecto para evitar overfitting.
-#
-#   sklearn.ensemble.RandomForestClassifier
-#     → Entrena N árboles de decisión sobre subconjuntos aleatorios
-#       de datos y features. La predicción final es por votación
-#       mayoritaria entre todos los árboles. Robusto a overfitting
-#       y captura relaciones no lineales entre features.
-#
-#   sklearn.ensemble.GradientBoostingClassifier
-#     → Construye árboles secuencialmente donde cada árbol corrige
-#       los errores del anterior (boosting). Generalmente el modelo
-#       más preciso de los tres pero más lento de entrenar.
-#       Muy efectivo en datasets tabulares como este.
-#
-#   sklearn.metrics.accuracy_score
-#     → Proporción de predicciones correctas sobre el total.
-#       (TP + TN) / total. Métrica base para clasificación.
-#
-#   sklearn.metrics.classification_report
-#     → Reporte completo con precision, recall y f1-score por clase.
-#       Precision: de los que predije como 1, cuántos eran realmente 1.
-#       Recall: de los que realmente eran 1, cuántos predije como 1.
-#       F1: media armónica de precision y recall. Útil cuando las
-#       clases están desbalanceadas (aquí: 62% no sobrevivió vs 38% sí).
-#
-#   sklearn.metrics.roc_auc_score
-#     → Área bajo la curva ROC (AUC). Mide qué tan bien el modelo
-#       separa las dos clases independientemente del umbral de decisión.
-#       AUC=1.0 → modelo perfecto | AUC=0.5 → equivale a adivinar al azar.
-#       Es la métrica más robusta para clasificación binaria desbalanceada.
-#
-#   sklearn.metrics.confusion_matrix
-#     → Matriz 2x2 que muestra:
-#       [TN, FP]   TN: predijo 0, era 0 (correcto)
-#       [FN, TP]   FP: predijo 1, era 0 (falso positivo)
-#                  FN: predijo 0, era 1 (falso negativo)
-#                  TP: predijo 1, era 1 (correcto)
+# Librerias utilizadas:
+#   train_test_split          — dividir datos en train y test
+#   cross_val_score           — validacion cruzada k-fold
+#   LogisticRegression        — modelo lineal para clasificacion binaria
+#   RandomForestClassifier    — ensamble de arboles de decision
+#   GradientBoostingClassifier— boosting secuencial de arboles
+#   accuracy_score            — proporcion de predicciones correctas
+#   roc_auc_score             — area bajo la curva ROC
+#   confusion_matrix          — matriz de verdaderos/falsos positivos y negativos
 
 import numpy as np
 import pandas as pd
@@ -327,95 +265,77 @@ from sklearn.metrics import (
     confusion_matrix
 )
 
-# ─────────────────────────────────────────────
-# FUNCIÓN PRINCIPAL DEL AGENTE 2
-# ─────────────────────────────────────────────
+
 def agente_entrenador(resultado_agente1: dict, random_state: int = 42) -> dict:
     """
     Agente 2 — Entrenador.
 
     Recibe el diccionario de salida del Agente 1 y devuelve:
-      - 'mejor_modelo'  : objeto del modelo con mejor AUC en test
-      - 'nombre_mejor'  : string con el nombre del mejor modelo
-      - 'metricas'      : dict con métricas de todos los modelos
-      - 'y_test'        : valores reales del conjunto de prueba
-      - 'y_pred_mejor'  : predicciones del mejor modelo en test
-      - 'reporte'       : dict con resumen estructurado para el Agente 3
+      - mejor_modelo  : modelo con mejor AUC en test
+      - nombre_mejor  : nombre del mejor modelo
+      - metricas      : dict con metricas de todos los modelos
+      - y_test        : valores reales del conjunto de prueba
+      - y_pred_mejor  : predicciones del mejor modelo en test
+      - reporte       : dict con resumen para el Agente 3
 
-    Parámetros:
-      resultado_agente1 → dict devuelto por agente_normalizador()
-      random_state      → semilla para reproducibilidad de resultados
+    Parametros:
+      resultado_agente1 — dict devuelto por agente_normalizador()
+      random_state      — semilla para reproducibilidad
     """
 
     print("=" * 60)
     print("AGENTE 2 — ENTRENADOR")
     print("=" * 60)
 
-    # ── Extraer datos del agente anterior ───────────────────────
-    X = resultado_agente1["X_procesado"]   # np.ndarray ya limpio y escalado
-    y = resultado_agente1["y"].values      # .values convierte la Serie en np.ndarray
-                                           # necesario porque sklearn espera arrays, no Series
+    X = resultado_agente1["X_procesado"]
+    y = resultado_agente1["y"].values  # convertir Serie a array para sklearn
 
-    # ── PASO 1: División train / test ────────────────────────────
-    # test_size=0.2  → 20% para evaluación final (178 muestras), 80% para entrenar (713)
-    # random_state   → semilla fija: garantiza que la división sea siempre la misma
-    # stratify=y     → mantiene la proporción de clases (38% survived) en ambos conjuntos
-    #                  Sin stratify, podría quedar un conjunto con muchos más 1 que 0
+    # Division train/test estratificada para mantener la proporcion
+    # de clases (38% survived) en ambos conjuntos
     X_train, X_test, y_train, y_test = train_test_split(
         X, y,
         test_size=0.2,
         random_state=random_state,
-        stratify=y      # clave en clasificación desbalanceada
+        stratify=y
     )
 
-    print(f"\n[PASO 1] División del dataset (stratified):")
+    print(f"\n[PASO 1] Division del dataset (stratified):")
     print(f"         Train: {X_train.shape[0]} muestras")
     print(f"         Test : {X_test.shape[0]} muestras")
-    print(f"         Proporción survived en train: {y_train.mean()*100:.1f}%")
-    print(f"         Proporción survived en test : {y_test.mean()*100:.1f}%")
+    print(f"         Proporcion survived en train: {y_train.mean()*100:.1f}%")
+    print(f"         Proporcion survived en test : {y_test.mean()*100:.1f}%")
 
-    # ── PASO 2: Definir modelos candidatos ───────────────────────
     modelos = {
         "Logistic Regression": LogisticRegression(
-            max_iter=1000,      # aumentar iteraciones para garantizar convergencia
-                                # con 10 features y escalado, 1000 es más que suficiente
+            max_iter=1000,       # iteraciones suficientes para garantizar convergencia
             random_state=random_state,
-            C=1.0               # inverso de la regularización L2; C=1.0 es el valor por defecto
-                                # valores más bajos = más regularización = modelo más simple
+            C=1.0                # regularizacion L2 por defecto
         ),
         "Random Forest": RandomForestClassifier(
-            n_estimators=200,   # 200 árboles: balance entre precisión y velocidad
-                                # más árboles reducen la varianza pero aumentan el tiempo
-            max_depth=10,       # profundidad máxima de cada árbol; limita overfitting
-            min_samples_split=5,# mínimo de muestras para dividir un nodo interno
-                                # valores más altos hacen el árbol más conservador
+            n_estimators=200,    # numero de arboles del ensamble
+            max_depth=10,        # profundidad maxima para limitar overfitting
+            min_samples_split=5, # minimo de muestras para dividir un nodo
             random_state=random_state,
-            n_jobs=-1           # usa todos los núcleos del CPU disponibles en paralelo
+            n_jobs=-1
         ),
         "Gradient Boosting": GradientBoostingClassifier(
-            n_estimators=200,   # número de árboles secuenciales
-            learning_rate=0.05, # tamaño del paso de actualización en cada iteración
-                                # valores pequeños = más robusto pero necesita más árboles
-            max_depth=4,        # árboles poco profundos son ideales para boosting
-                                # evitan que cada árbol individual haga overfitting
-            subsample=0.8,      # fracción de muestras usadas por árbol (stochastic boosting)
-                                # introduce aleatoriedad que reduce overfitting
+            n_estimators=200,    # numero de arboles secuenciales
+            learning_rate=0.05,  # paso de actualizacion en cada iteracion
+            max_depth=4,         # arboles poco profundos, ideal para boosting
+            subsample=0.8,       # fraccion de muestras por arbol (stochastic boosting)
             random_state=random_state
         )
     }
 
     print(f"\n[PASO 2] Modelos a evaluar: {list(modelos.keys())}")
 
-    # ── PASO 3: Entrenamiento, validación cruzada y métricas ─────
     resultados = {}
 
     for nombre, modelo in modelos.items():
         print(f"\n[ENTRENANDO] {nombre}...")
 
-        # --- Validación cruzada con 5 folds ---
-        # scoring="roc_auc" → usa AUC como métrica de validación cruzada
-        # Es más informativa que accuracy para clases desbalanceadas
-        # cv=5 → 5 particiones: más estable que 3, menos costoso que 10
+        # Validacion cruzada con 5 folds usando AUC como metrica
+        # AUC es mas informativa que accuracy para clases desbalanceadas
         cv_scores = cross_val_score(
             modelo, X_train, y_train,
             cv=5,
@@ -423,46 +343,25 @@ def agente_entrenador(resultado_agente1: dict, random_state: int = 42) -> dict:
             n_jobs=-1
         )
 
-        # --- Entrenar el modelo final sobre todo X_train ---
-        # .fit() ajusta los parámetros internos del modelo a los datos
-        # Para LogisticRegression: aprende los coeficientes de cada feature
-        # Para RandomForest: construye los N árboles de decisión
-        # Para GradientBoosting: construye los árboles secuencialmente
+        # Entrenar el modelo final sobre todo X_train
         modelo.fit(X_train, y_train)
 
-        # --- Predicciones en test ---
-        # .predict() devuelve la clase predicha (0 o 1) para cada muestra
+        # predict() devuelve la clase predicha (0 o 1)
         y_pred = modelo.predict(X_test)
 
-        # .predict_proba() devuelve la probabilidad de cada clase [prob_0, prob_1]
-        # [:, 1] selecciona la probabilidad de la clase positiva (survived=1)
-        # Necesario para calcular AUC, que trabaja con probabilidades, no clases
+        # predict_proba()[:,1] devuelve la probabilidad de clase positiva
+        # necesaria para calcular AUC
         y_prob = modelo.predict_proba(X_test)[:, 1]
 
-        # --- Métricas en test ---
         accuracy = accuracy_score(y_test, y_pred)
-        # accuracy_score: (predicciones correctas) / total
-        # Limitación: puede ser engañosa si las clases están desbalanceadas
-
-        auc = roc_auc_score(y_test, y_prob)
-        # roc_auc_score: área bajo la curva ROC
-        # No depende del umbral de decisión (0.5 por defecto en .predict())
-        # Es la métrica principal para seleccionar el mejor modelo
+        auc      = roc_auc_score(y_test, y_prob)
 
         cm = confusion_matrix(y_test, y_pred)
-        # confusion_matrix: [[TN, FP], [FN, TP]]
         tn, fp, fn, tp = cm.ravel()
-        # .ravel() aplana la matriz 2x2 a un array de 4 elementos
 
-        # Precision: TP / (TP + FP) → de los que predije como survived, cuántos lo eran
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-
-        # Recall: TP / (TP + FN) → de los que sobrevivieron, cuántos detecté
-        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-
-        # F1: 2 * (precision * recall) / (precision + recall)
-        # Media armónica entre precision y recall; penaliza valores extremos
-        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+        recall    = tp / (tp + fn) if (tp + fn) > 0 else 0
+        f1        = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
 
         resultados[nombre] = {
             "modelo"      : modelo,
@@ -479,18 +378,16 @@ def agente_entrenador(resultado_agente1: dict, random_state: int = 42) -> dict:
                              "fn": int(fn), "tp": int(tp)},
         }
 
-        print(f"         CV AUC  : {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
+        print(f"         CV AUC  : {cv_scores.mean():.4f} +/- {cv_scores.std():.4f}")
         print(f"         Test AUC: {auc:.4f}")
         print(f"         Accuracy: {accuracy:.4f}")
         print(f"         F1 Score: {f1:.4f}")
         print(f"         Precision: {precision:.4f} | Recall: {recall:.4f}")
         print(f"         Confusion: TN={tn} FP={fp} FN={fn} TP={tp}")
 
-    # ── PASO 4: Selección del mejor modelo ───────────────────────
-    # Se usa AUC como criterio de selección porque:
-    # 1. Es independiente del umbral de decisión
-    # 2. Es más robusta que accuracy con clases desbalanceadas
-    # 3. Mide la capacidad discriminativa general del modelo
+    # Seleccionar el mejor modelo por AUC:
+    # metrica independiente del umbral de decision y robusta
+    # ante clases desbalanceadas
     nombre_mejor = max(resultados, key=lambda k: resultados[k]["auc"])
     mejor        = resultados[nombre_mejor]
 
@@ -499,16 +396,14 @@ def agente_entrenador(resultado_agente1: dict, random_state: int = 42) -> dict:
     print(f"         Accuracy = {mejor['accuracy']:.4f}")
     print(f"         F1       = {mejor['f1']:.4f}")
 
-    # ── PASO 5: Tabla comparativa ─────────────────────────────────
     print(f"\n[PASO 5] Tabla comparativa:")
     print(f"{'Modelo':<25} {'AUC':>8} {'Accuracy':>10} {'F1':>8} {'CV AUC':>10}")
     print("-" * 65)
     for n, r in resultados.items():
-        marca = " ← MEJOR" if n == nombre_mejor else ""
+        marca = " <- MEJOR" if n == nombre_mejor else ""
         print(f"{n:<25} {r['auc']:>8.4f} {r['accuracy']:>10.4f} "
               f"{r['f1']:>8.4f} {r['cv_auc_mean']:>10.4f}{marca}")
 
-    # Construir reporte para el Agente 3
     reporte = {
         "mejor_modelo_nombre" : nombre_mejor,
         "auc"                 : round(mejor["auc"], 4),
@@ -534,7 +429,7 @@ def agente_entrenador(resultado_agente1: dict, random_state: int = 42) -> dict:
         }
     }
 
-    print("\n✅ Agente 2 completado. Métricas listas para el Agente 3.")
+    print("\nAgente 2 completado. Metricas listas para el Agente 3.")
 
     return {
         "mejor_modelo" : mejor["modelo"],
@@ -547,68 +442,121 @@ def agente_entrenador(resultado_agente1: dict, random_state: int = 42) -> dict:
     }
 
 
-# ─── EJECUCIÓN ────────────────────────────────────────────────
 resultado_agente2 = agente_entrenador(resultado_agente1, random_state=42)
 
 # ============================================================
-# BLOQUE 5 — AGENTE 3: COMUNICADOR (Transformers - Flan-T5)
+# BLOQUE 5 — AGENTE 3: CARGA DEL MODELO (Qwen2.5-1.5B-Instruct)
 # ============================================================
-# Responsabilidad: recibir los resultados de los agentes
-# anteriores, generar un reporte automático en lenguaje natural
-# y permitir al usuario hacer preguntas sobre el análisis.
+# Cargar el modelo de lenguaje en memoria. Este bloque se ejecuta
+# una sola vez por sesion. El Bloque 6 reutiliza el modelo ya
+# cargado sin necesidad de repetir este paso.
 #
-# Por qué Flan-T5 y no RoBERTa:
-#   RoBERTa es un modelo EXTRACTIVO: solo puede copiar fragmentos
-#   del contexto como respuesta. Si la información no está
-#   textualmente en el contexto, no puede responder.
+# Se utiliza Qwen2.5-1.5B-Instruct, un modelo decoder-only con
+# instruction-tuning y chat_template formal (roles system/user/
+# assistant). A diferencia de Flan-T5 (encoder-decoder para tareas
+# cortas), Qwen2.5 esta disenado para razonamiento conversacional
+# sobre contextos extensos, lo que mejora la coherencia de las
+# respuestas.
 #
-#   Flan-T5 es un modelo GENERATIVO (seq2seq):
-#   - Encoder: lee y comprende el contexto completo
-#   - Decoder: GENERA una respuesta nueva en lenguaje natural
-#   - Fue entrenado con instruction tuning: entiende instrucciones
-#     como "summarize:", "answer:", "explain:" directamente
-#   - Puede razonar sobre los datos y generar texto coherente
-#   - Tamaño "base" (~250MB): corre bien en CPU en Colab
-#
-# Flujo del agente:
-#   1. Construir contexto con todos los resultados del pipeline
-#   2. Generar reporte automático inicial con el modelo
-#   3. Loop interactivo: el usuario hace preguntas y el modelo
-#      genera respuestas basándose en el contexto
+# Librerias utilizadas:
+#   AutoTokenizer         — carga el tokenizador correcto segun el modelo
+#   AutoModelForCausalLM  — carga un modelo de lenguaje causal (decoder-only)
 
 import torch
-# torch: backend de PyTorch necesario para ejecutar transformers
-# torch.cuda.is_available() detecta si hay GPU disponible
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from transformers import T5Tokenizer, T5ForConditionalGeneration
-# T5Tokenizer: convierte texto en tokens que el modelo entiende
-#   Usa SentencePiece: tokenización por subpalabras
-#   Ej: "survival" → ["sur", "vival"] → [1045, 2571]
+# Detectar si hay GPU disponible
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"[PASO 1] Dispositivo: {device.upper()}")
+if device == "cpu":
+    print("         Sin GPU: la carga puede tardar varios minutos.")
+
+MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
+
+print(f"\n[PASO 2] Cargando modelo '{MODEL_NAME}'...")
+print(f"         (Puede tardar varios minutos la primera vez)")
+
+# Cargar vocabulario y reglas de tokenizacion de Qwen2.5
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+
+# torch_dtype="auto" usa float16 con GPU y float32 con CPU
+model = AutoModelForCausalLM.from_pretrained(
+    MODEL_NAME,
+    torch_dtype="auto",
+    device_map=device
+)
+
+# Modo evaluacion: desactiva dropout para inferencia determinista
+model.eval()
+
+print(f"         Modelo cargado correctamente en {device.upper()}.")
+print(f"\n[LISTO] Ejecutar el Bloque 6 para generar reportes o hacer preguntas.")
+
+# ============================================================
+# BLOQUE 6 — AGENTE 3: REPORTE Y PREGUNTAS (Qwen2.5-1.5B-Instruct)
+# ============================================================
+# Reutilizar el modelo cargado en el Bloque 5 para:
+#   1. Calcular estadisticas adicionales del dataset original
+#   2. Construir el contexto del analisis
+#   3. Responder preguntas del usuario en lenguaje natural
 #
-# T5ForConditionalGeneration: arquitectura T5 completa
-#   - Encoder: procesa el texto de entrada (contexto + pregunta)
-#   - Decoder: genera el texto de salida token por token
-#   - "ForConditionalGeneration": la generación está condicionada
-#     al texto de entrada (no genera libremente)
+# Se usa chat_template con roles system/user/assistant, el formato
+# que Qwen2.5 espera para seguir instrucciones correctamente.
 
-# ─────────────────────────────────────────────
-# FUNCIÓN: construir el contexto
-# ─────────────────────────────────────────────
-def construir_contexto(reporte_a1: dict, reporte_a2: dict) -> str:
+import pandas as pd
+
+
+def calcular_estadisticas_extra(df: pd.DataFrame) -> dict:
     """
-    Construye un texto de contexto en inglés con todos los
-    resultados del pipeline completo.
+    Calcular estadisticas descriptivas adicionales sobre el dataset
+    original que no estan en los reportes de los Agentes 1 y 2.
 
-    Por qué en inglés:
-      Flan-T5 fue entrenado principalmente en inglés.
-      El contexto en inglés garantiza mejor comprensión
-      y respuestas más precisas y fluidas.
-
-    Se incluyen todos los datos relevantes del análisis
-    para que el modelo pueda responder la mayor variedad
-    de preguntas posibles.
+    Estas estadisticas (porcentaje de mujeres, supervivencia por
+    sexo y clase, etc.) son necesarias para responder preguntas
+    demograficas con datos reales en lugar de estimaciones.
     """
+    pct_mujeres = (df["Sex"] == "female").mean() * 100
+    pct_hombres = (df["Sex"] == "male").mean() * 100
 
+    surv_por_sexo  = df.groupby("Sex")["Survived"].mean() * 100
+    surv_por_clase = df.groupby("Pclass")["Survived"].mean() * 100
+
+    pct_clase1 = (df["Pclass"] == 1).mean() * 100
+    pct_clase2 = (df["Pclass"] == 2).mean() * 100
+    pct_clase3 = (df["Pclass"] == 3).mean() * 100
+
+    edad_promedio           = df["Age"].dropna().mean()
+    edad_sobrevivientes     = df[df["Survived"] == 1]["Age"].dropna().mean()
+    edad_no_sobrevivientes  = df[df["Survived"] == 0]["Age"].dropna().mean()
+
+    fare_promedio = df["Fare"].mean()
+
+    return {
+        "total_pasajeros"        : len(df),
+        "pct_mujeres"            : round(pct_mujeres, 1),
+        "pct_hombres"            : round(pct_hombres, 1),
+        "surv_mujeres"           : round(surv_por_sexo.get("female", 0), 1),
+        "surv_hombres"           : round(surv_por_sexo.get("male", 0), 1),
+        "surv_clase1"            : round(surv_por_clase.get(1, 0), 1),
+        "surv_clase2"            : round(surv_por_clase.get(2, 0), 1),
+        "surv_clase3"            : round(surv_por_clase.get(3, 0), 1),
+        "pct_clase1"             : round(pct_clase1, 1),
+        "pct_clase2"             : round(pct_clase2, 1),
+        "pct_clase3"             : round(pct_clase3, 1),
+        "edad_promedio"          : round(edad_promedio, 1),
+        "edad_sobrevivientes"    : round(edad_sobrevivientes, 1),
+        "edad_no_sobrevivientes" : round(edad_no_sobrevivientes, 1),
+        "fare_promedio"          : round(fare_promedio, 2),
+    }
+
+
+def construir_contexto(reporte_a1: dict, reporte_a2: dict, stats_extra: dict) -> str:
+    """
+    Construir el texto de contexto con los resultados del pipeline.
+
+    Este texto se incluye en el system prompt del modelo para que
+    tenga acceso a todos los datos factuales necesarios al responder.
+    """
     cols_num  = reporte_a1["cols_numericas"]
     cols_cat  = reporte_a1["cols_categoricas"]
     cols_desc = reporte_a1["cols_descartadas"]
@@ -633,236 +581,204 @@ def construir_contexto(reporte_a1: dict, reporte_a2: dict) -> str:
     comparativa = ""
     for nombre, metricas in todos.items():
         comparativa += (
-            f"{nombre} achieved AUC={metricas['auc']}, "
-            f"accuracy={metricas['accuracy']}, "
-            f"F1={metricas['f1']}, "
-            f"cross-validation AUC={metricas['cv_auc_mean']}. "
+            f"- {nombre}: AUC={metricas['auc']}, accuracy={metricas['accuracy']}, "
+            f"F1={metricas['f1']}, cross-validation AUC={metricas['cv_auc_mean']}\n"
         )
 
     contexto = (
-        f"Dataset: Titanic passenger survival prediction. "
-        f"Total samples: 891 rows and 12 columns. "
-        f"Survival rate: {tasa_surv} percent. "
-        f"Female passengers and first class passengers had significantly higher survival rates. "
-        f"Training samples: {n_train}. Test samples: {n_test}. "
+        f"DATASET: Titanic passenger survival prediction.\n"
+        f"- Total passengers: {stats_extra['total_pasajeros']}\n"
+        f"- Overall survival rate: {tasa_surv}%\n"
+        f"- Female passengers: {stats_extra['pct_mujeres']}% | Male passengers: {stats_extra['pct_hombres']}%\n"
+        f"- Survival rate for females: {stats_extra['surv_mujeres']}%\n"
+        f"- Survival rate for males: {stats_extra['surv_hombres']}%\n"
+        f"- Class distribution: 1st class {stats_extra['pct_clase1']}%, "
+        f"2nd class {stats_extra['pct_clase2']}%, 3rd class {stats_extra['pct_clase3']}%\n"
+        f"- Survival rate by class: 1st={stats_extra['surv_clase1']}%, "
+        f"2nd={stats_extra['surv_clase2']}%, 3rd={stats_extra['surv_clase3']}%\n"
+        f"- Average passenger age: {stats_extra['edad_promedio']} years\n"
+        f"- Average age of survivors: {stats_extra['edad_sobrevivientes']} years\n"
+        f"- Average age of non-survivors: {stats_extra['edad_no_sobrevivientes']} years\n"
+        f"- Average ticket fare: ${stats_extra['fare_promedio']}\n\n"
 
-        f"Preprocessing: columns discarded (no predictive value): {', '.join(cols_desc)}. "
-        f"Cabin was discarded because it had 77 percent missing values. "
-        f"Numeric features used: {', '.join(cols_num)}. "
-        f"Categorical features used: {', '.join(cols_cat)}. "
-        f"Missing values in numeric columns: {nulos_num} (Age column, imputed with median). "
-        f"Missing values in categorical columns: {nulos_cat} (Embarked column, imputed with most frequent value). "
-        f"After preprocessing: zero missing values. "
-        f"Numeric features scaled with StandardScaler (mean=0, std=1). "
-        f"Categorical features encoded with One-Hot Encoding. "
-        f"Total features after preprocessing: {n_feat}. "
+        f"PREPROCESSING (Agent 1 - Normalizer):\n"
+        f"- Training samples: {n_train} | Test samples: {n_test}\n"
+        f"- Columns discarded (no predictive value): {', '.join(cols_desc)}\n"
+        f"- Cabin was discarded because it had 77% missing values\n"
+        f"- Numeric features used: {', '.join(cols_num)}\n"
+        f"- Categorical features used: {', '.join(cols_cat)}\n"
+        f"- Missing values in Age: {nulos_num}, imputed with median (robust to outliers)\n"
+        f"- Missing values in Embarked: {nulos_cat}, imputed with most frequent value\n"
+        f"- After imputation: zero missing values\n"
+        f"- Numeric features scaled with StandardScaler (mean=0, std=1)\n"
+        f"- Categorical features encoded with One-Hot Encoding\n"
+        f"- Total features after preprocessing: {n_feat}\n\n"
 
-        f"Models trained: {comparativa}"
-        f"Best model: {mejor}. "
-        f"Best model AUC: {auc}. "
-        f"Best model accuracy: {accuracy}. "
-        f"Best model F1 score: {f1}. "
-        f"Best model precision: {precision}. "
-        f"Best model recall: {recall}. "
-        f"Cross-validation AUC: {cv_auc} plus or minus {cv_std}. "
-        f"Confusion matrix: "
-        f"{confusion['tn']} true negatives, "
-        f"{confusion['fp']} false positives, "
-        f"{confusion['fn']} false negatives, "
-        f"{confusion['tp']} true positives. "
-        f"An AUC above 0.8 indicates good discriminative ability. "
-        f"Logistic Regression was the best model because survival is approximately "
-        f"linearly related to Sex and Pclass features."
+        f"MODEL TRAINING (Agent 2 - Trainer):\n"
+        f"- 5-fold cross-validation was used\n"
+        f"- Selection criterion: AUC (robust to class imbalance: 62% did not survive vs 38% survived)\n"
+        f"Results per model:\n"
+        f"{comparativa}"
+        f"- Best model: {mejor}\n"
+        f"- Best model test AUC: {auc} (>0.8 = good discriminative ability)\n"
+        f"- Best model accuracy: {accuracy} ({accuracy*100:.1f}% correct predictions)\n"
+        f"- Best model F1 score: {f1}\n"
+        f"- Best model precision: {precision} | recall: {recall}\n"
+        f"- Cross-validation AUC: {cv_auc} +/- {cv_std}\n"
+        f"- Confusion matrix: TN={confusion['tn']}, FP={confusion['fp']}, "
+        f"FN={confusion['fn']}, TP={confusion['tp']}\n\n"
+
+        f"INTERPRETATION:\n"
+        f"- {mejor} was selected because survival relates approximately linearly "
+        f"to Sex and Pclass, the two strongest predictors\n"
+        f"- Logistic Regression models linear relationships directly, while "
+        f"tree-based models are better for complex non-linear patterns\n"
+        f"- An AUC of {auc} means: given a random survivor and a random "
+        f"non-survivor, the model ranks the survivor correctly "
+        f"{auc*100:.1f}% of the time"
     )
 
     return contexto
 
 
-# ─────────────────────────────────────────────
-# FUNCIÓN: generar respuesta con Flan-T5
-# ─────────────────────────────────────────────
-def generar_respuesta(model, tokenizer, device: str,
-                       prompt: str, max_tokens: int = 200) -> str:
+def generar_respuesta_chat(model, tokenizer, device: str,
+                            contexto: str, pregunta_usuario: str,
+                            max_new_tokens: int = 300) -> str:
     """
-    Genera una respuesta en lenguaje natural usando Flan-T5.
+    Generar una respuesta usando el formato de chat de Qwen2.5.
 
-    El prompt combina una instrucción + el contexto + la pregunta.
-    El modelo genera tokens secuencialmente hasta completar
-    la respuesta o alcanzar max_tokens.
+    Construye mensajes con roles system/user y aplica el chat_template
+    del tokenizador para obtener el formato exacto que el modelo espera.
+    Se tokeniza el prompt resultante por separado para obtener un tensor
+    limpio compatible con model.generate().
 
-    Parámetros:
-      model      → modelo T5ForConditionalGeneration cargado
-      tokenizer  → T5Tokenizer correspondiente al modelo
-      device     → 'cuda' o 'cpu'
-      prompt     → texto completo de entrada para el modelo
-      max_tokens → máximo de tokens a generar en la respuesta
+    Parametros:
+      model            — modelo AutoModelForCausalLM cargado
+      tokenizer        — AutoTokenizer correspondiente
+      device           — cuda o cpu
+      contexto         — texto con los datos del analisis
+      pregunta_usuario — pregunta del usuario
+      max_new_tokens   — maximo de tokens a generar
     """
+    mensajes = [
+        {
+            "role": "system",
+            "content": (
+                "You are a data science assistant. You have access to the results "
+                "of a machine learning pipeline analyzing the Titanic dataset. "
+                "Answer questions using ONLY the information provided below. "
+                "Be clear, specific, and explain your reasoning. "
+                "If asked for a number, state it explicitly. "
+                "If the information needed is not provided, say so honestly "
+                "instead of making up numbers.\n\n"
+                f"{contexto}"
+            )
+        },
+        {
+            "role": "user",
+            "content": pregunta_usuario
+        }
+    ]
 
-    # tokenizer() convierte el texto en tensores de IDs de tokens
-    # return_tensors="pt"  → tensores PyTorch
-    # max_length=512       → T5-base soporta hasta 512 tokens de entrada
-    # truncation=True      → trunca si el prompt supera el límite
-    inputs = tokenizer(
-        prompt,
-        return_tensors="pt",
-        max_length=512,
-        truncation=True
-    ).to(device)
-    # .to(device) mueve los tensores al mismo dispositivo que el modelo
+    # apply_chat_template con tokenize=False devuelve el texto con el
+    # formato correcto de Qwen2.5 (<|im_start|>system, etc.)
+    # Se tokeniza luego por separado para obtener un tensor input_ids limpio
+    prompt_texto = tokenizer.apply_chat_template(
+        mensajes,
+        tokenize=False,
+        add_generation_prompt=True
+    )
 
-    # torch.no_grad() desactiva el cálculo de gradientes
-    # Solo necesarios en entrenamiento, no en inferencia
-    # Reduce uso de memoria a la mitad y acelera el proceso
+    inputs    = tokenizer(prompt_texto, return_tensors="pt").to(device)
+    input_ids = inputs["input_ids"]
+
+    # torch.no_grad() desactiva el calculo de gradientes en inferencia
     with torch.no_grad():
         output_ids = model.generate(
-            inputs["input_ids"],
-            max_new_tokens=max_tokens,  # máximo de tokens a generar
-            num_beams=4,                # beam search: evalúa 4 hipótesis en paralelo
-                                        # y elige la secuencia con mayor probabilidad
-                                        # Es mejor que greedy search (num_beams=1)
-            early_stopping=True,        # detiene cuando todos los beams llegan a </s>
-            no_repeat_ngram_size=3,     # penaliza repetición de trigramas
-                                        # evita que el modelo repita frases
-            length_penalty=1.2          # >1.0 favorece respuestas más largas y completas
+            input_ids,
+            max_new_tokens=max_new_tokens,
+            do_sample=True,       # muestreo probabilistico para respuestas mas naturales
+            temperature=0.4,      # valores bajos dan respuestas mas centradas en los hechos
+            top_p=0.9,            # nucleus sampling: descarta opciones muy improbables
+            repetition_penalty=1.1,
+            pad_token_id=tokenizer.eos_token_id
         )
 
-    # tokenizer.decode() convierte los IDs de tokens de vuelta a texto
-    # skip_special_tokens=True elimina <pad>, </s>, <unk> del output
-    respuesta = tokenizer.decode(output_ids[0], skip_special_tokens=True)
-    return respuesta
+    # Descartar los tokens del prompt y decodificar solo la respuesta generada
+    respuesta_ids = output_ids[0][input_ids.shape[-1]:]
+    respuesta     = tokenizer.decode(respuesta_ids, skip_special_tokens=True)
+
+    return respuesta.strip()
 
 
-# ─────────────────────────────────────────────
-# FUNCIÓN PRINCIPAL DEL AGENTE 3
-# ─────────────────────────────────────────────
-def agente_comunicador(reporte_a1: dict, reporte_a2: dict,
-                        model_name: str = "google/flan-t5-base") -> None:
-    """
-    Agente 3 — Comunicador.
+# Preparar contexto del analisis
+print("=" * 60)
+print("AGENTE 3 — PREPARANDO CONTEXTO DEL ANALISIS")
+print("=" * 60)
 
-    1. Genera un reporte automático del pipeline completo
-    2. Lanza un loop interactivo donde el usuario puede hacer
-       preguntas en lenguaje natural sobre el análisis
-
-    Parámetros:
-      reporte_a1 → dict 'reporte' del resultado del Agente 1
-      reporte_a2 → dict 'reporte' del resultado del Agente 2
-      model_name → identificador del modelo HuggingFace
-    """
-
-    print("=" * 60)
-    print("AGENTE 3 — COMUNICADOR (Flan-T5 Generativo)")
-    print("=" * 60)
-
-    # ── PASO 1: Detectar dispositivo ─────────────────────────────
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"\n[PASO 1] Dispositivo: {device.upper()}")
-
-    # ── PASO 2: Cargar tokenizador y modelo ──────────────────────
-    # from_pretrained descarga los pesos del modelo de HuggingFace Hub
-    # y los cachea en ~/.cache/huggingface para no re-descargar
-    print(f"\n[PASO 2] Cargando modelo '{model_name}'...")
-    print(f"         (Primera vez puede tardar ~1 minuto)")
-
-    tokenizer = T5Tokenizer.from_pretrained(model_name)
-    # T5Tokenizer.from_pretrained descarga el vocabulario SentencePiece
-    # y la configuración del tokenizador
-
-    model = T5ForConditionalGeneration.from_pretrained(model_name)
-    # T5ForConditionalGeneration.from_pretrained descarga los pesos
-    # del modelo (~250MB para flan-t5-base)
-
-    model = model.to(device)
-    # .to(device) mueve todos los parámetros del modelo a GPU o CPU
-
-    model.eval()
-    # .eval() pone el modelo en modo evaluación:
-    # desactiva dropout y batch normalization que solo aplican en entrenamiento
-    # garantiza predicciones deterministas
-
-    print(f"Modelo cargado correctamente.")
-
-    # ── PASO 3: Construir contexto ───────────────────────────────
-    contexto = construir_contexto(reporte_a1, reporte_a2)
-    print(f"\n[PASO 3] Contexto construido ({len(contexto)} caracteres).")
-
-    # ── PASO 4: Generar reporte automático inicial ───────────────
-    # El prefijo "summarize:" es una instrucción que Flan-T5 reconoce
-    # fue entrenado con estos prefijos para distinguir tareas distintas
-    print(f"\n[PASO 4] Generando reporte automático...")
-
-    prompt_reporte = (
-        f"summarize: {contexto} "
-        f"Write a professional report explaining the machine learning pipeline, "
-        f"the preprocessing steps, the models evaluated, and the final results."
-    )
-
-    reporte_generado = generar_respuesta(
-        model, tokenizer, device,
-        prompt_reporte,
-        max_tokens=250
-    )
-
-    print(f"\n{'=' * 60}")
-    print(f"📄 REPORTE AUTOMÁTICO GENERADO POR FLAN-T5")
-    print(f"{'=' * 60}")
-    print(reporte_generado)
-    print(f"{'=' * 60}")
-
-    # ── PASO 5: Loop interactivo de preguntas ────────────────────
-    print(f"\n[PASO 5] Sistema de preguntas activo.")
-    print(f"         Ejemplos de preguntas:")
-    ejemplos = [
-        "What was the best model?",
-        "What is the AUC score?",
-        "How many missing values were imputed?",
-        "What features were used?",
-        "What does the confusion matrix show?",
-        "Is the model reliable?",
-        "What was the accuracy?",
-        "Why was Logistic Regression selected?",
-    ]
-    for i, e in enumerate(ejemplos, 1):
-        print(f"   {i}. {e}")
-
-    print(f"\n{'=' * 60}")
-    print(f"💬 Escribí tu pregunta en inglés. Escribí 'salir' para terminar.")
-    print(f"{'=' * 60}\n")
-
-    while True:
-        pregunta = input("❓ Tu pregunta: ").strip()
-
-        if pregunta.lower() in ["salir", "exit", "quit", "q"]:
-            print("\n✅ Agente 3 finalizado.")
-            break
-
-        if not pregunta:
-            print("   ⚠️  Por favor escribí una pregunta.\n")
-            continue
-
-        # Construir prompt de pregunta-respuesta
-        # El prefijo "answer the question based on the context:" indica
-        # a Flan-T5 que debe responder usando la información del contexto
-        # y no inventar datos externos
-        prompt_pregunta = (
-            f"answer the question based on the context. "
-            f"Context: {contexto} "
-            f"Question: {pregunta}"
-        )
-
-        print(f"   ⏳ Generando respuesta...")
-
-        respuesta = generar_respuesta(
-            model, tokenizer, device,
-            prompt_pregunta,
-            max_tokens=150
-        )
-
-        print(f"\n💡 Respuesta: {respuesta}\n")
-
-
-# ─── EJECUCIÓN ────────────────────────────────────────────────
-agente_comunicador(
-    reporte_a1 = resultado_agente1["reporte"],
-    reporte_a2 = resultado_agente2["reporte"]
+stats_extra       = calcular_estadisticas_extra(df_raw)
+contexto_analisis = construir_contexto(
+    resultado_agente1["reporte"],
+    resultado_agente2["reporte"],
+    stats_extra
 )
+
+print(f"\nContexto preparado ({len(contexto_analisis)} caracteres).")
+print(f"Modelo en uso: Qwen2.5-1.5B-Instruct sobre {device.upper()}")
+
+# Loop interactivo de preguntas
+print(f"\n{'=' * 60}")
+print(f"AGENTE 3 — ASISTENTE CONVERSACIONAL")
+print(f"{'=' * 60}")
+print(f"Comandos especiales:")
+print(f"   'reporte' — genera un reporte general del analisis")
+print(f"   'salir'   — termina la sesion")
+print(f"\nEjemplos de preguntas:")
+ejemplos = [
+    "What percentage of passengers were female?",
+    "Why was Logistic Regression selected as the best model?",
+    "How does survival rate differ between men and women?",
+    "Explain what the AUC score means in this context",
+    "What does the confusion matrix tell us about errors?",
+    "How were missing values handled and why?",
+    "Was being in first class an advantage? Explain why.",
+    "Is this model reliable enough to use? Why or why not?",
+]
+for i, e in enumerate(ejemplos, 1):
+    print(f"   {i}. {e}")
+
+print(f"\n{'=' * 60}\n")
+
+while True:
+    entrada = input("Pregunta (o 'reporte' / 'salir'): ").strip()
+
+    if entrada.lower() in ["salir", "exit", "quit", "q"]:
+        print("\nAgente 3 finalizado.")
+        break
+
+    if not entrada:
+        print("   Por favor escribir una pregunta.\n")
+        continue
+
+    if entrada.lower() == "reporte":
+        pregunta_efectiva = (
+            "Write a clear, professional summary report covering: "
+            "(1) the dataset and key demographics, (2) the preprocessing "
+            "steps applied and why, (3) the models trained and their "
+            "results, and (4) the final conclusion about model quality. "
+            "Structure it in short paragraphs."
+        )
+        max_tokens = 400
+    else:
+        pregunta_efectiva = entrada
+        max_tokens        = 250
+
+    print(f"   Generando respuesta...")
+
+    respuesta = generar_respuesta_chat(
+        model, tokenizer, device,
+        contexto_analisis, pregunta_efectiva,
+        max_new_tokens=max_tokens
+    )
+
+    print(f"\n{respuesta}\n")
