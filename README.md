@@ -55,7 +55,7 @@ no fue seleccionado.
 - Separe el Agente 3 en dos bloques (carga del modelo / preguntas)
   para no tener que recargar 3GB cada vez que queria probar algo.
 
-  ## Capturas del Agente 3
+  ## Capturas del Output de los Agentes
 
 - Captura Output del agente 1
 ![pregunta 1](assets/captura1.png)
