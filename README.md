@@ -57,11 +57,11 @@ no fue seleccionado.
 
   ## Capturas del Agente 3
 
--Captura Output del agente 1
+- Captura Output del agente 1
 ![pregunta 1](assets/captura1.png)
 
--Captura Output del agente 2
+- Captura Output del agente 2
 ![pregunta 2](assets/captura2.png)
 
--Captura Output del agente 3
+- Captura Output del agente 3
 ![pregunta 2](assets/captura2.png)
